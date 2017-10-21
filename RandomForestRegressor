@@ -1,0 +1,8 @@
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.cross_validation import train_test_split
+X,y=dff2.iloc[:,2:].values,dff2.iloc[:,1].values
+X_train,X_test,y_train,y_test = train_test_split(X,y,test_size=0.2,random_state=9)
+regr = RandomForestRegressor(n_jobs=-1,n_estimators=500,max_features='sqrt',min_samples_leaf=50)
+regr.fit(X_train, y_train)
+# MAPE
+print((100/y_test.shape[0])*(np.absolute((y_test-regr.predict(X_test))/y_test).sum()))
