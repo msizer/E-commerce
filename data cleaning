@@ -1,0 +1,144 @@
+#-*- coding: utf-8 -*-
+import pandas as pd
+import numpy as np
+import time
+import datetime
+
+cdf=pd.read_csv('/Users/msize/Downloads/analysis/1006.csv') 
+def getdf(x,n):
+    d=pd.DataFrame(x)
+    d=d.rename(columns={0:n})
+    return d
+def getDate(x):
+    try:
+        a=int(str(x-datetime.datetime.strptime('2016/01/01','%Y/%m/%d')).split(' ')[0])
+    except:
+        a=0
+    return a
+def getage(x):
+    if x>=0 and x <18:
+        a='fake'
+    elif x>18 and x<=25:
+        a='18~25'
+    elif x>25 and x<=30:
+        a='26~30'
+    elif x>30 and x<=35:
+        a='31~35'
+    elif x>35 and x<=40:
+        a='36~40'
+    elif x>40 and x<=45:
+        a='41~45'
+    elif x>45 and x<=50:
+        a='46~50'
+    elif x>50 and x <=65:
+        a='50~65'
+    else:
+        a='fake'
+    return a
+def getid(x):
+    return x[0]
+#資料前處理
+df1=pd.concat([getdf(cdf['會員區域'],'會員區域')\
+               ,getdf(list(map(getage,cdf['會員年齡'])),'會員年齡')\
+               ,getdf(list(map(getDate,cdf['交易時間'])),'交易時間')\
+               ,getdf(list(map(getDate,cdf['會員註冊日'])),'會員註冊日')\
+               ,getdf(cdf['會員編號'],'會員編號'),getdf(cdf['交易金額'],'交易金額')\
+               ,getdf(cdf['商品代號'],'商品代號')],axis=1)
+start = time.time()
+df2=pd.get_dummies(df1['商品代號']) #商品代號的攤平
+del df1['商品代號']   
+del df1['會員註冊日']
+dff=pd.concat([df1,df2],axis=1)  #合併攤平後的資料
+ndf=np.array(dff)  
+lndf=ndf.tolist()  
+finallist=[]
+dff
+#資料攤平＋合併(會員代號與日期相等者)
+while len(lndf)>0:
+    num=[]
+    count=0
+    for idx in range(0,len(lndf)): 
+        if lndf[0][2]==lndf[idx][2] and lndf[0][3]==lndf[idx][3]:   #([0][0]會員編號 
+             num.append(idx)
+    df=np.array(lndf[0][4:])
+    dfname=np.array(lndf[0][0:4]) #取得不能做相加的欄位
+    
+    for idx1 in num:
+        if idx1==0:
+            del lndf[idx1-count]   
+        else:
+            df=df+np.array(lndf[idx1-count][4:])
+            del lndf[idx1-count]
+        count=count+1
+    finallist.append(np.append(dfname,df))
+
+#類別屬性直大於1者改為1
+finallist1=[]
+for i in range(0,len(finallist)):
+    a=[]
+    df=finallist[i][0:5]    
+    for categoryname in finallist[i][5:]:   #各商品類別欄位
+        b=int(categoryname)
+        if b >= 1:
+            a.append(1)
+        else:
+            a.append(0)
+    finallist1.append(np.append(df,a))
+df=pd.DataFrame(finallist1)
+
+for i,name in enumerate(dff):
+    df=df.rename(columns={i:name})
+    
+dfage=pd.get_dummies(df['會員年齡'])
+dfloc=pd.get_dummies(df['會員區域'])
+del df['會員年齡']
+del df['會員區域']
+df=pd.concat([df,dfage,dfloc],axis=1)
+df=df[df['fake']!=1]
+df=df.reset_index(drop=True)
+df=df.sort_values(by=['會員編號','交易時間'],ascending=['True','True'])
+df=df.reset_index(drop=True)
+mid=pd.DataFrame(df['會員編號'])
+mid=list(map(getid,np.array(mid.drop_duplicates())))
+c=[] #間隔
+d=[] #金額
+n=[] #類別
+m=[] #會員編號
+for name in mid:
+    df1=df[df['會員編號']==name]
+    df1=np.array(df1)
+    if len(df1)<=8:
+        continue
+    else:
+        for idx,arr in enumerate(df1):
+            if idx==len(df1)-1:
+                c.append(int(arr[0])-time)
+                break
+            elif idx==0:
+                m.append(name)
+                n.append(arr[3:])
+                d.append(arr[2])
+                time=int(arr[0])
+                    
+            else:
+                c.append(int(arr[0])-time)
+                m.append(name)
+                n.append(arr[3:])
+                d.append(arr[2])
+                time=int(arr[0])
+a=pd.DataFrame(m)
+a=a.rename(columns={0:'會員編號'})
+b=pd.DataFrame(d)
+b=b.rename(columns={0:'消費金額'})
+c=pd.DataFrame(c)
+c=c.rename(columns={0:'間隔時間'})
+d=pd.DataFrame(n)
+for idx,name in enumerate(df):
+    if idx>=3:
+        d=d.rename(columns={idx-3:name})
+dff=pd.concat([a,b,c,d],axis=1)
+dff1=dff
+del dff1['會員編號']
+dff2=dff1[dff1['間隔時間']>30]
+dff2=dff2[dff2['間隔時間']<365]
+dff2=dff2.reset_index(drop=True)
