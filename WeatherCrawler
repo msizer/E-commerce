@@ -1,0 +1,139 @@
+import urllib
+import os
+import requests
+import json 
+import time
+import pandas as pd
+from time import sleep
+
+##產生指定url的function
+def yieldurl(city,toyear,tomonths):   
+    urllist=[]
+    for year in range(2016,toyear+1):
+        for month in range(1,13):
+            if month<3 and year==2016:
+                urllist.append("http://tianqi.2345.com/t/wea_history/js/" +str(city)+ "_" +str(year)+str(month)+\
+                                ".js?qq-pf-to= pcqq.c2c")
+            elif month>tomonths and year==toyear:
+                continue
+            else:
+                if month>=10:
+                    urllist.append("http://tianqi.2345.com/t/wea_history/js/" +str(year)+str(month)+'/'+str(city)+ \
+                                    "_" +str(year)+str(month)+".js?qq-pf-to= pcqq.c2c")
+                else:
+                    urllist.append("http://tianqi.2345.com/t/wea_history/js/" +str(year)+'0'+str(month)+'/'+str(city)+ \
+                                    "_" +str(year)+'0'+str(month)+".js?qq-pf-to= pcqq.c2c")
+    return urllist
+
+def getsituation(x):
+    if x==1:
+        situ='天氣狀況'
+        tsitu='situation'
+    elif x==2:
+        situ='最高溫'
+        tsitu='maxtemperature'
+    elif x==3:
+        situ='最低溫'
+        tsitu='mintemperature'
+    else:
+        situ='all'
+        tsitu='all'
+    return situ,tsitu
+
+
+
+def getweather(cities,citylist,year,month,situ,tsitu):
+    ll=[]
+    for idx,city in enumerate(cities): 
+        dflist=[]
+        # yieldurl函數(城市代號,到何年,到何月)
+        urllist=yieldurl(city,year,month)  
+
+        for url in urllist:
+            #抓url的資訊轉成文字
+            req=requests.get(url).text 
+            req=req.split('tqInfo:')[1].split(']')[0]+']' 
+            req=req.replace('ymd',"'time'").replace('bWendu',"'maxtemperature'")\
+                .replace('yWendu',"'mintemperature'").replace('tianqi',"'situation'")\
+                .replace('fengxiang',"'wind'").replace('fengli',"'windpower'")\
+                .replace('aqiInfo',"'airqualityinfo'").replace('aqiLevel',"'airqualitylevel'")\
+                .replace('aqi',"'airquality'").replace("\'","\"")
+
+            #此時才可以正確讀檔
+            df=pd.read_json(req)
+
+            #取situation欄位                  
+            df1=df[tsitu]
+
+            #取time欄位
+            df2=df['time']
+
+            #concat將[df2,df1](df2在左,df1在右)合併 axis為合併的方向 0為垂直 1為水平
+            dflist.append(pd.concat([df2,df1],axis=1))
+        dfflist=[]
+        for b in range(0,len(dflist)):
+            s=[]
+            d=[]
+            for a in range(0,len(dflist[b])-1):
+                s.append(str(dflist[b][tsitu][a]).replace('阴','陰')\
+                         .replace('云','雲').replace('阵','陣')) 
+                d.append(str(dflist[b]['time'][a]))
+            df=pd.DataFrame({'date':d,'{}{}'.format(citylist[idx],situ):s}) #命名 
+            dfflist.append(df)
+            time.sleep(0.01)
+        df=dfflist[0]
+        for num in range(1,len(dfflist)):        
+            #將各月份的表格上下合併存為df
+            df=pd.concat([df,dfflist[num]],axis=0)
+
+        #刪去na值 how='any' 任一筆資料有出現na 就刪除該筆資料
+        df=df.dropna(how='any')
+
+        df=df.reset_index(drop=True)
+
+        #df=df.rename(columns = {0:'date',1:'{}'.format(citylist[idx])})
+        ll.append(df)
+        #將刪去na的df存為csv檔  {}為城市代號  路徑自訂資料夾需要存在
+        #df.to_csv('/Users/msize/Downloads/test/{}.csv'.format(citylist[idx])) 
+    df=ll[0]
+    for i in range(1,len(ll)):
+        df=pd.merge(df,ll[i],how='inner', on='date')
+    return df
+
+
+
+#填入不同城市的代號
+citylist=['台北','桃園','新竹','宜蘭','嘉義','台南','台東','屏東','苗栗','彰化','南投','花蓮','雲林','台中','高雄']
+cities=[71294,71295,71296,71297,71298,71299,71300,71301,71302,71303,71304,71305,71306,71082,59554]
+while True:
+    a=input('1.天氣狀況 2.最高溫度 3.最低溫度 4.以上皆是')
+    if a=='1'or a=='2' or a=='3' or a=='4':
+        break
+    print('輸入有誤')
+a=int(a)
+situ,tsitu=getsituation(a)
+while True:
+    b=input('請輸入年份(大於2016),月份 ex: 2017,08 ')
+    try:
+        b1,b2=b.split(',')
+        break
+    except:
+        print('請重新輸入')
+b1=int(b1)
+b2=int(b2)
+while True:
+    path=input('檔案存放路徑')
+    if os.path.exists(path)!=True:
+        print('路徑不存在')
+    else:
+        break
+if a==4:
+    for s,t in [['天氣狀況','situation'],['最高溫','maxtemperature'],['最低溫','mintemperature']]:
+        df=getweather(cities,citylist,b1,b2,s,t)
+        df.to_csv('{}{}.csv'.format(path,t))
+else:
+    df=getweather(cities,citylist,b1,b2,situ,tsitu)
+    df.to_csv('{}{}.csv'.format(path,tsitu))
+
+
+print('completed')
