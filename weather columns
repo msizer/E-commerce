@@ -1,0 +1,50 @@
+import pandas as pd
+from datetime import datetime
+def getweatherindex(timedata,i):
+    try:
+        a=int(str(datetime.strptime(timedata,"%Y/%m/%d")-datetime.strptime('2016-01-01 00:00:00',"%Y-%m-%d %H:%M:%S")).split(' ')[0])
+    except:
+        a=0
+    return a
+
+df=pd.read_csv('/Users/msize/Downloads/orders.csv')
+wdf=pd.read_csv('/Users/msize/Downloads/test/maxtemperature.csv') #丟天氣資料
+df1=df['訂單編號']
+df2=df['會員地址']
+df3=df['交易時間']
+newdf1=[]
+
+for idx,i in enumerate(df1):
+    newdf1.append(str(int(df1[idx])))
+df4=[]
+for i in range(0,len(df2)):
+    try:
+        a=str(df2[i]).split('市')[0].split('縣')[0]
+        if a=='新北'or a=='基隆': 
+            df4.append('台北')
+        else:
+            df4.append(a)
+    except:
+        df4.append('error')
+        print(i)
+df5=[]
+for a in df3:
+    df5.append(a.split(' ')[0])
+df5=pd.DataFrame(df5)
+df5=df5.rename(columns={0:'交易時間'})
+df4=pd.DataFrame(df4)
+df4=df4.rename(columns={0:'地區'})
+df=pd.concat([df1,df4,df5],axis=1)
+newlst=[]
+
+for idx,time in enumerate(df5['交易時間']): #丟時間
+    try:
+        newlst.append(wdf['{}最高溫'.format(df4['地區'][idx])][getweatherindex(time,idx)])
+    except:
+        print(idx)
+        newlst.append('NAN')
+newdf1=pd.DataFrame(newdf1)
+newdf1=newdf1.rename(columns={0:'訂單編號'})
+df=pd.concat([newdf1,pd.DataFrame(newlst)],axis=1)
+df=dfall.rename(columns={0:'最高溫'})
+df.to_csv('/Users/msize/Downloads/test/ordersweather.csv')
