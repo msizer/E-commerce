@@ -1,0 +1,17 @@
+#-*- coding: utf-8 -*-
+from scipy import stats
+import pandas as pd
+from sklearn.cluster import KMeans 
+
+data=pd.read_csv('/Users/msize/Downloads/kmeans.csv')
+data=data.iloc[:,1:]
+data1=stats.zscore(data)
+kmodel=KMeans(n_clusters=3,n_jobs=4,init='k-means++')
+
+kmodel.fit(data1)
+kmodel.labels_
+kmodel.cluster_centers_
+kcluster=pd.concat([data,pd.DataFrame(kmodel.labels_)],axis=1)
+kcluster=kcluster.rename(columns={0:'cluster'})
+kcluster
+kcluster.describe()
